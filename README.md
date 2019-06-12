@@ -1,6 +1,10 @@
 ZX11 - a wrapper for interface library to the X Window System
 Copyright (C) 1999 Tomomichi Sugihara (Zhidao)
 
+| *master* | *develop* |
+|----------|-----------|
+| [![Build Status](https://travis-ci.org/n-wakisaka/zx11.svg?branch=master)](https://travis-ci.org/n-wakisaka/zx11) | [![Build Status](https://travis-ci.org/n-wakisaka/zx11.svg?branch=develop)](https://travis-ci.org/n-wakisaka/zx11)
+
 -----------------------------------------------------------------
 [What is this?]
 
