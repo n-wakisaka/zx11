@@ -4,6 +4,12 @@ addons:
   apt:
     packages:
       - git
+      - libx11-dev
+      - libxext-dev
+      - libxpm-dev
+      - libpng12-dev
+      - libjpeg8-dev
+      - zlib1g-dev
 before_script:
   - mkdir -p ~/usr/include
   - mkdir -p ~/usr/bin
