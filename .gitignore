@@ -1,10 +1,11 @@
-*.so
-*.o
-config
 GPATH
 GRTAGS
 GSYMS
 GTAGS
-app/
+config
+src/*.o
+app/*
 !app/*.c
 !app/makefile
+lib/*
+!lib/.gitkeep
