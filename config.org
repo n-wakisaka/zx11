@@ -1,8 +1,8 @@
 PREFIX=$(HOME)/usr
 PROJNAME=zx11
-VERSION=1.0.3
+VERSION=1.1.8
 
-DEPENDENCY="zeda=1.1.1"
+DEPENDENCY="zeda=1.2.29"
 
 # original widget
 CONFIG_USE_WIDGET=y
@@ -18,6 +18,10 @@ CONFIG_USE_XPM=y
 # PNG (Portable Network Graphics) format support
 # (libz and libpng required)
 CONFIG_USE_PNG=y
+
+# TIFF (Tag Image File Format) format support
+# (libtiff required)
+CONFIG_USE_TIFF=y
 
 # JPEG format support
 # (libjpeg required)

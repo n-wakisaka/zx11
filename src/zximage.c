@@ -465,6 +465,26 @@ zxImage *zxImageResize(zxImage *src, zxImage *dest)
 
 /* color manipulation */
 
+zxImage *zxImageAbstRGB(zxImage *src, zxImage *rimg, zxImage *gimg, zxImage *bimg)
+{
+  register int i, j;
+  ubyte r, g, b;
+  zxPixelManip pm;
+
+  zxPixelManipSet( &pm, zxdepth );
+  for( i=0; i<src->height; i++ )
+    for( j=0; j<src->width; j++ ){
+      zxImageCellRGB( src, &pm, j, i, &r, &g, &b );
+      if( rimg && zxImagePosIsValid( rimg, j, i ) )
+        zxImageCellFromRGB( rimg, &pm, j, i, r, 0, 0 );
+      if( gimg && zxImagePosIsValid( gimg, j, i ) )
+        zxImageCellFromRGB( gimg, &pm, j, i, 0, g, 0 );
+      if( bimg && zxImagePosIsValid( bimg, j, i ) )
+        zxImageCellFromRGB( bimg, &pm, j, i, 0, 0, b );
+    }
+  return src;
+}
+
 zxImage *zxImageAntialias(zxImage *src, zxImage *dest)
 {
   register uint x, y, x1, x2, y1, y2;
@@ -572,6 +592,49 @@ zxImage *zxImageNegate(zxImage *src, zxImage *dest)
   return dest;
 }
 
+zxImage *zxImageToneDown(zxImage *src, zxImage *dest, double rate)
+{
+  register uint i, j;
+  ubyte r, g, b;
+  zxPixelManip pm;
+
+  rate = zLimit( rate, 0, 1 );
+  zxPixelManipSetDefault( &pm );
+  for( i=0; i<src->height; i++ )
+    for( j=0; j<src->width; j++ ){
+      zxImageCellRGB( src, &pm, j, i, &r, &g, &b );
+      r *= rate; g *= rate; b *= rate;
+      zxImageCellFromRGB( dest, &pm, j, i, r, g, b );
+    }
+  return dest;
+}
+
+zxImage *zxImageDither(zxImage *src, zxImage *dest)
+{
+  static double bayerpattern[] = {
+     0,  8,  2, 10,
+    12,  4, 14,  6,
+     3, 11,  1,  9,
+    15,  7, 13,  5 };
+  register int i, j;
+  uint w, h;
+  zxPixelManip pm;
+  ubyte r, g, b, th;
+
+  zxImageCanvasRange( dest, src, 0, 0, &w, &h );
+  zxPixelManipSetDefault( &pm );
+  for( i=0; i<h; i++ )
+    for( j=0; j<w; j++ ){
+      th = bayerpattern[ (i%4)*4 + (j%4) ]*16 + 8;
+      zxImageCellRGB( src, &pm, j, i, &r, &g, &b );
+      zxImageCellFromRGB( dest, &pm, j, i,
+        r >= th ? 0xff : 0,
+        g >= th ? 0xff : 0,
+        b >= th ? 0xff : 0 );
+    }
+  return dest;
+}
+
 /* special effect */
 
 zxPixel zxImageAverage(zxImage *img, zxPixelManip *pm, uint x, uint y, uint w, uint h)
@@ -636,7 +699,7 @@ Pixmap zxImageToPixmap(zxWindow *win, zxImage *img, Pixmap pmap, uint src_x, uin
   if( ( ip = XCreateImage( zxdisplay, CopyFromParent, zxdepth, ZPixmap,
           16, (char *)img->buf, img->width, img->height,
           img->bpp<<3, img->bpp*img->width ) ) ){
-    XPutImage( zxdisplay, pmap, zxGC(win), ip, src_x, src_y, dest_x, dest_y, w, h );
+    XPutImage( zxdisplay, pmap, zxWindowGC(win), ip, src_x, src_y, dest_x, dest_y, w, h );
     free( ip );
   }
   return pmap;
@@ -685,11 +748,31 @@ void zxImageDraw(zxWindow *win, zxImage *img, uint src_x, uint src_y, uint w, ui
     zxClipSetOrigin( win, dest_x - src_x, dest_y - src_y );
     zxClipSetMask( win, mask );
   }
-  zxImageToPixmap( win, img, zxCanvas(win), src_x, src_y, w, h, dest_x, dest_y );
+  zxImageToPixmap( win, img, zxWindowCanvas(win), src_x, src_y, w, h, dest_x, dest_y );
   if( mask != None ){
     zxClipUnsetMask( win );
     zxPixmapDestroy( mask );
   }
+}
+
+bool zxImageDrawMask(zxWindow *win, zxImage *img, uint src_x, uint src_y, uint w, uint h, uint dest_x, uint dest_y)
+{
+  zxImage mask;
+  zxPixelManip pm;
+  register int i, j;
+  ubyte val, *mp;
+
+  if( !( mp = img->mask_buf ) ) return false;
+  if( !zxImageAllocDefault( &mask, img->width, img->height ) ) return false;
+  zxPixelManipSetDefault( &pm );
+  for( i=0; i<img->height; i++ )
+    for( j=0; j<img->width; j++ ){
+      val = *mp++;
+      zxImageCellFromRGB( &mask, &pm, j, i, val, val, val );
+    }
+  zxImageToPixmap( win, &mask, zxWindowCanvas(win), src_x, src_y, w, h, dest_x, dest_y );
+  zxImageDestroy( &mask );
+  return true;
 }
 
 zxImage *zxImageFromPixmap(zxImage *img, Pixmap pmap, uint w, uint h)
@@ -725,6 +808,8 @@ bool zxImageFileIdent(char filename[], const char ident[], int size)
 
 int zxImageReadFile(zxImage *img, char filename[])
 {
+  zxImageInit( img );
+
   /* Portable Bitmap/Graymap/Pixmap */
   if( zxImageFileIsPNM( filename ) )
     return zxImageReadPNMFile( img, filename );
@@ -733,6 +818,11 @@ int zxImageReadFile(zxImage *img, char filename[])
   if( zxImageFileIsPNG( filename ) )
     return zxImageReadPNGFile( img, filename );
 #endif /* __ZX11_USE_PNG */
+
+#ifdef __ZX11_USE_TIFF
+  if( zxImageFileIsTIFF( filename ) )
+    return zxImageReadTIFFFile( img, filename );
+#endif /* __ZX11_USE_TIFF */
 
 #ifdef __ZX11_USE_JPEG
   if( zxImageFileIsJPEG( filename ) )
